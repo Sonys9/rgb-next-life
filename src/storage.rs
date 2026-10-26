@@ -44,7 +44,7 @@ impl<'a> Storage<'a> {
         Ok(4 + align_to)
     }
 
-    pub fn update<'b>(&mut self, auth: Auth<'b>) -> Result<(), Error> {
+    pub fn update<'b>(&mut self, auth: &Auth<'b>) -> Result<(), Error> {
         if auth.ssid.len() + auth.password.len() > SECTOR as usize {
             return Err(Error::TooBig);
         };

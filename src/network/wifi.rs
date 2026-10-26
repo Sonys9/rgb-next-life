@@ -1,4 +1,7 @@
-use core::{mem::{self, transmute}, net::{Ipv4Addr, SocketAddrV4}};
+use core::{
+    mem::{self, transmute},
+    net::{Ipv4Addr, SocketAddrV4},
+};
 
 use alloc::string::ToString;
 use embassy_executor::Spawner;
@@ -17,12 +20,7 @@ use edge_dhcp::{
 use edge_nal::UdpBind;
 use edge_nal_embassy::{Udp, UdpBuffers};
 
-macro_rules! mk_static {
-    ($t:ty, $val:expr) => {{
-        static STATIC_CELL: static_cell::StaticCell<$t> = static_cell::StaticCell::new();
-        STATIC_CELL.init($val)
-    }};
-}
+use crate::mk_static;
 
 pub struct AP {
     controller: WifiController<'static>,
@@ -45,10 +43,13 @@ impl AP {
                     )),
             ));
         let controller = WifiController::new(wifi, controller_config).unwrap();
-        Self { controller, gateaway }
+        Self {
+            controller,
+            gateaway,
+        }
     }
 
-    pub async fn start(&self, spawner: &Spawner) {
+    pub async fn start<'a>(&self, spawner: &Spawner) -> Stack<'a> {
         let rng = Rng::new();
         let seed = (rng.random() as u64) << 32 | rng.random() as u64;
         let (stack, runner) = embassy_net::new(
@@ -64,15 +65,14 @@ impl AP {
         spawner.spawn(net_task(runner).unwrap());
         spawner.spawn(run_dhcp(self.gateaway, stack).unwrap());
 
-        let controller: WifiController<'static> = unsafe {
-            mem::transmute_copy(&self.controller)
-        };
+        let controller: WifiController<'static> = unsafe { mem::transmute_copy(&self.controller) };
         spawner.spawn(connection(controller).unwrap());
-        
+
         stack.wait_config_up().await;
         stack
             .config_v4()
             .inspect(|config| info!("config ipv4: {:?}", config));
+        stack
     }
 }
 
@@ -107,6 +107,7 @@ async fn run_dhcp(gateaway: Ipv4Addr, stack: Stack<'static>) {
 
 #[embassy_executor::task]
 async fn connection(controller: WifiController<'static>) {
+    info!("Spawned a connection handler");
     loop {
         let ev = controller
             .wait_for_access_point_connected_event_async()

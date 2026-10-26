@@ -28,9 +28,9 @@ macro_rules! log_type {
     };
 }
 
-log_type!(info, "\x1b[32mINFO\x1b[0m");
-log_type!(error, "\x1b[31mERROR\x1b[0m");
-log_type!(warn, "\x1b[33mWARN\x1b[0m");
+log_type!(info, "\x1b[32mℹ️  INFO\x1b[0m");
+log_type!(error, "\x1b[31m⛔  ERROR\x1b[0m");
+log_type!(warn, "\x1b[33m⚠️  WARN\x1b[0m");
 
 pub struct Terminal;
 
