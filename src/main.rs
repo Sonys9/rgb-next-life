@@ -11,13 +11,15 @@ use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_alloc::HEAP;
 use esp_hal::clock::CpuClock;
+use esp_hal::peripherals::WIFI;
 use esp_hal::rng::Rng;
 use esp_hal::system::software_reset;
 use esp_hal::timer::timg::TimerGroup;
+use esp_radio::wifi;
 
 use crate::log::Serial;
-use crate::network::Http;
-use crate::storage::{Auth, Storage};
+use crate::network::{Auth, Http};
+use crate::storage::Storage;
 
 #[macro_use]
 mod log;
@@ -37,7 +39,6 @@ static mut HTTP: Option<Http> = None;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
-#[allow(static_mut_refs)]
 #[esp_rtos::main]
 async fn main(spawner: Spawner) -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
@@ -53,28 +54,36 @@ async fn main(spawner: Spawner) -> ! {
     let read_buffer = &mut [0u8; 128];
     let write_buffer = &mut [0u8; 128];
     let mut storage = Storage::new(peripherals.FLASH, read_buffer, write_buffer);
-    storage.erase().expect("Failed to erase the storage");
 
-    let auth = match storage.read() {
-        Err(errors::Error::Parse) => {
-            let ap = network::AP::new(AP_SSID, AP_PASSWORD, GATEAWAY_ADDR, peripherals.WIFI);
-            let stack = ap.start(&spawner).await;
-            let http = Http::new(stack);
-            let http_ref: &'static Http = unsafe { 
-                HTTP = Some(http);
-                HTTP.as_ref().unwrap()
-            };
-            let auth = http_ref.start(&spawner).await;
-            unsafe { HTTP = None };
-            drop(ap);
-            storage.update(&auth).expect("Failed to update the storage");
-            auth
-        },
+    let auth = match storage.read().await {
+        Err(errors::Error::Parse) => get_auth(storage, unsafe { peripherals.WIFI.clone_unchecked() }, &spawner).await,
+        Ok(auth) if auth.ssid.is_empty() && auth.password.is_empty() => get_auth(storage, unsafe { peripherals.WIFI.clone_unchecked() }, &spawner).await,
         Ok(auth) => auth,
         Err(e) => panic!("Failed to read the storage: {}", e)
     };
-    info!("got auth data: {:?}", auth);
+    let amc = auth.auth_method.to_amc(&auth.password).unwrap();
+    info!("got auth data: {:?} ({:?})", auth, amc);
+    // auth.auth_method.0 = auth.password;
+
+    // let wifi = network::WiFi::new(AP_SSID, AP_PASSWORD, GATEAWAY_ADDR, peripherals.WIFI);
+    
 
     core::future::pending::<()>().await;
     loop {} // never happens
+}
+
+#[allow(static_mut_refs)]
+async fn get_auth<'a>(mut storage: Storage<'a>, wifi_interface: WIFI<'static>, spawner: &Spawner) -> Auth {
+    let wifi = network::WiFi::new(AP_SSID, AP_PASSWORD, GATEAWAY_ADDR, wifi_interface);
+    let stack = wifi.access_point(&spawner).await;
+    let http = Http::new(stack);
+    let http_ref: &'static Http = unsafe { 
+        HTTP = Some(http);
+        HTTP.as_ref().unwrap()
+    };
+    let auth = http_ref.start(&spawner).await;
+    unsafe { HTTP = None };
+    drop(wifi);
+    storage.update(&auth).expect("Failed to update the storage");
+    auth
 }

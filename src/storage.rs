@@ -1,12 +1,14 @@
 use core::slice::from_raw_parts;
 
+use embassy_time::Timer;
 use esp_hal::peripherals::FLASH;
+use esp_println::println;
+use esp_radio::wifi::{self, AuthenticationMethodConfig, Password};
 use esp_storage::FlashStorage;
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer, de::{IntoDeserializer, value::U8Deserializer}};
 
 use crate::{
-    bytes::{align, utf8},
-    errors::Error,
+    bytes::{align, utf8}, errors::Error, network::{Auth, AuthMethod},
 };
 
 const MEM_OFFSET: u32 = 0x3F0000;
@@ -50,34 +52,40 @@ impl<'a> Storage<'a> {
             return Err(Error::TooBig);
         };
         self.erase()?;
-        let len = self.write_slice(0, auth.ssid.as_bytes())?;
-        self.write_slice(len as u32, auth.password.as_bytes())?;
+        let ssid_len = self.write_slice(0, auth.ssid.as_bytes())?;
+        let password_len = self.write_slice(ssid_len as u32, auth.password.as_bytes())?;
+        self.write_buffer[0] = u8::try_from(&auth.auth_method).map_err(|_| Error::Parse)?;
+        self.flash
+            .write(MEM_OFFSET + ssid_len as u32 + password_len as u32, &self.write_buffer[..4])
+            .map_err(|_| Error::StorageWrite)?;
         Ok(())
     }
 
-    pub fn read_slice(&self, offset: usize) -> Result<(&'a [u8], usize), Error> {
+    pub fn read_slice(&'a self, offset: usize) -> Result<(&'a [u8], usize), Error> {
         let len = usize::from_be_bytes(self.read_buffer[offset..offset + 4].try_into().unwrap());
+        if len == usize::MAX {
+            return Ok((b"", 0))
+        };
         let aligned_len = (len + 3) & !3;
-        let result = unsafe { from_raw_parts(self.read_buffer.as_ptr().add(offset + 4), len) };
-        Ok((result, aligned_len - len))
+        let result = &self.read_buffer[offset + 4..offset + 4 + len];
+        Ok((result, aligned_len))
     }
 
-    pub fn read(&mut self) -> Result<Auth, Error> {
+    pub async fn read(&mut self) -> Result<Auth, Error> {
         self.flash
             .read(MEM_OFFSET, self.read_buffer)
             .map_err(|_| Error::StorageRead)?;
+        println!("{:?}",&self.read_buffer[..64]);
         let (ssid, skip) = self.read_slice(0)?;
-        let password_pos = ssid.len() + 4 + skip;
-        let (password, _) = self.read_slice(password_pos)?;
+        let password_pos = 4 + skip;
+        let (password, skip) = self.read_slice(password_pos)?;
+        let auth_method = AuthMethod::try_from(self.read_buffer[password_pos + skip + 4]).map_err(|_| Error::Parse)?;
+        
         Ok(Auth {
-            ssid: utf8(ssid)?.try_into().unwrap(),
-            password: utf8(password)?.try_into().unwrap(),
+            ssid: utf8(ssid)?.try_into().map_err(|_| Error::Parse)?,
+            password: utf8(password)?.try_into().map_err(|_| Error::Parse)?,
+            auth_method,
         })
     }
 }
 
-#[derive(Debug, Deserialize)]
-pub struct Auth {
-    pub ssid: heapless::String<64>,
-    pub password: heapless::String<128>,
-}

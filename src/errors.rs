@@ -21,7 +21,7 @@ pub enum Error {
     #[error("Buffer is too small")]
     Buffer,
 
-    #[error("UTF-8 parse error")]
+    #[error("Parse error")]
     Parse,
 
     #[error("Failed to read the storage")]

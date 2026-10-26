@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            body {
+                background-color: #1f1f20;
+                display: grid;
+                align-items: center;
+                place-items: center;
+                height: 100vh;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            }
+            h1 {
+                color: white
+            }
+            .main {
+                background-color: #353637;
+                border-radius: 20px;
+                padding: 1em 3em;
+                display: flex;
+                flex-direction: column;
+            }
+            .input, .select {
+                border: none;
+                border-radius: 20px;
+                outline: none;
+                padding: 1em 1em;
+                font-size: 0.8em;
+                color: white;
+                background-color: #1e1e1f;
+                box-sizing: border-box;
+                width: 100%;
+            }
+            /* Стилизация выпадающего списка */
+            .select {
+                appearance: none;
+                -webkit-appearance: none;
+                -moz-appearance: none;
+                cursor: pointer;
+                background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://w3.org' width='10' height='10' fill='white'><polygon points='0,0 10,0 5,5'/></svg>");
+                background-repeat: no-repeat;
+                background-position: right 1.5em top 50%;
+            }
+            .button {
+                border: none;
+                border-radius: 20px;
+                outline: none;
+                padding: 1em 0;
+                width: 100%;
+                font-size: 0.8em;
+                color: white;
+                background-color: #16c89c;
+                cursor: pointer;
+            }
+            .spacer {
+                height: 1.5em;
+            }
+        </style>
+    </head>
+    <body>
+        <form action="/submit" method="POST">
+            <div class="main">
+                <h1>Setup!</h1>
+                
+                <input class="input" name="ssid" placeholder="Wi-Fi SSID" required>
+                <div class="spacer"></div>
+                
+                <input class="input" name="password" placeholder="Wi-Fi Password">
+                <div class="spacer"></div>
+                
+                <select class="select" name="auth_method" required>
+                    <option value="0">Open</option>
+                    <option value="1">WEP</option>
+                    <option value="2">WPA</option>
+                    <option value="3">WPA2 Personal</option>
+                    <option value="4">WPA/WPA2 Personal</option>
+                </select>
+                <div class="spacer"></div>
+                
+                <button class="button" type="submit">Done!</button>
+            </div>
+        </form>
+    </body>
+</html>

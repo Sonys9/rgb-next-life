@@ -22,12 +22,12 @@ use edge_nal_embassy::{Udp, UdpBuffers};
 
 use crate::mk_static;
 
-pub struct AP {
+pub struct WiFi {
     controller: WifiController<'static>,
     gateaway: Ipv4Addr,
 }
 
-impl AP {
+impl WiFi {
     pub fn new<'a>(
         ssid: &'a str,
         password: &'a str,
@@ -49,7 +49,7 @@ impl AP {
         }
     }
 
-    pub async fn start<'a>(&self, spawner: &Spawner) -> Stack<'a> {
+    pub async fn access_point<'a>(&self, spawner: &Spawner) -> Stack<'a> {
         let rng = Rng::new();
         let seed = (rng.random() as u64) << 32 | rng.random() as u64;
         let (stack, runner) = embassy_net::new(
@@ -67,7 +67,7 @@ impl AP {
 
         let controller: WifiController<'static> = unsafe { mem::transmute_copy(&self.controller) };
         spawner.spawn(connection(controller).unwrap());
-
+        
         stack.wait_config_up().await;
         stack
             .config_v4()

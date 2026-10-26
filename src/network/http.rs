@@ -1,10 +1,10 @@
 use embassy_executor::Spawner;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 use embassy_time::Timer;
-use picoserve::{AppBuilder, AppRouter, extract::Form, response::{File, IntoResponse}, routing::{get, post}};
+use picoserve::{AppBuilder, AppRouter, extract::Form, response::{File, IntoResponse}, routing::{get, get_service, post}};
 use serde::Deserialize;
 
-use crate::{mk_static, storage::Auth};
+use crate::{mk_static, network::Auth};
 
 static CONFIG: picoserve::Config = picoserve::Config::const_default().keep_connection_alive();
 static AUTH_DATA: Signal<CriticalSectionRawMutex, Auth> = Signal::new();
@@ -21,7 +21,7 @@ impl AppBuilder for App {
         picoserve::Router::new()
             .route(
                 "/",
-                get(Http::index),
+                get_service(File::html(include_str!("../public/index.html"))),
             )
             .route(
                 "/submit",
@@ -51,11 +51,6 @@ impl Http {
         }
 
         AUTH_DATA.wait().await
-    }
-
-    async fn index() -> impl IntoResponse {
-        info!("Got GET on /");
-        "<!DOCTYPE HTML><html><body><h1>Hello, world!</h1></body></html>"
     }
 }
 
