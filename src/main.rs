@@ -35,8 +35,6 @@ const AP_SSID: &'static str = "RGB-NEXT-LIFE";
 const AP_PASSWORD: &'static str = "rgb!nextlife";
 const GATEAWAY_ADDR: Ipv4Addr = Ipv4Addr::new(192, 168, 67, 1);
 
-static mut HTTP: Option<Http> = None;
-
 esp_bootloader_esp_idf::esp_app_desc!();
 
 #[esp_rtos::main]
@@ -63,10 +61,6 @@ async fn main(spawner: Spawner) -> ! {
     };
     let amc = auth.auth_method.to_amc(&auth.password).unwrap();
     info!("got auth data: {:?} ({:?})", auth, amc);
-    // auth.auth_method.0 = auth.password;
-
-    // let wifi = network::WiFi::new(AP_SSID, AP_PASSWORD, GATEAWAY_ADDR, peripherals.WIFI);
-    
 
     core::future::pending::<()>().await;
     loop {} // never happens
@@ -77,12 +71,8 @@ async fn get_auth<'a>(mut storage: Storage<'a>, wifi_interface: WIFI<'static>, s
     let wifi = network::WiFi::new(AP_SSID, AP_PASSWORD, GATEAWAY_ADDR, wifi_interface);
     let stack = wifi.access_point(&spawner).await;
     let http = Http::new(stack);
-    let http_ref: &'static Http = unsafe { 
-        HTTP = Some(http);
-        HTTP.as_ref().unwrap()
-    };
+    let http_ref: &'static Http = mk_static!(Http, http);
     let auth = http_ref.start(&spawner).await;
-    unsafe { HTTP = None };
     drop(wifi);
     storage.update(&auth).expect("Failed to update the storage");
     auth
