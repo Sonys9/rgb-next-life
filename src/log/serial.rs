@@ -3,7 +3,7 @@ use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::{Chann
 use embassy_time::{Duration, with_timeout};
 use embedded_io_async::Write;
 use esp_hal::{
-    Async, peripherals::USB_DEVICE, usb_serial_jtag::{UsbSerialJtag, UsbSerialJtagRx, UsbSerialJtagTx},
+    Async, peripherals::USB_DEVICE, usb::usb_serial_jtag::{UsbSerialJtag, UsbSerialJtagRx, UsbSerialJtagTx},
 };
 use crate::errors::Error;
 
