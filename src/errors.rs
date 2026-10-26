@@ -7,5 +7,17 @@ pub enum Error {
     TryLockError,
 
     #[error("Invalid input")]
-    InvalidInput
+    InvalidInput,
+
+    #[error("Failed to erase the storage")]
+    Erase,
+
+    #[error("Failed to write the storage")]
+    Write,
+
+    #[error("The data is too big")]
+    TooBig,
+
+    #[error("Buffer is too small")]
+    Buffer,
 }

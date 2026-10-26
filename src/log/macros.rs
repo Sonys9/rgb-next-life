@@ -8,15 +8,18 @@ macro_rules! terminal {
             let mut writer = crate::log::Terminal;
             let _ = write!(writer, $($data),*);
             
-            if let Ok(mut serial) = Serial::get() && Some(ref serial) = *&serial.as_mut() {
-                serial.flush();
-            };
+            if let Ok(serial) = crate::log::Serial::get() {
+                if let Some(serial) = &*serial {
+                    let _ = serial.flush();
+                }
+            }
         }
     };
 }
 
 macro_rules! log_type {
     ($name:ident, $title:expr) => {
+        #[macro_export]
         macro_rules! $name {
             ($$($$data:expr),* $$(,)?) => {
                 terminal!("[{}] {}\n", $title, format_args!($$($$data),*))
@@ -39,7 +42,7 @@ impl core::fmt::Write for Terminal {
         let Some(ref serial) = *&serial.as_mut() else {
             return Ok(());
         };
-        serial.print(s.as_bytes());
+        let _ = serial.print(s.as_bytes());
         Ok(())
     }
 }
