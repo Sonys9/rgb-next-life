@@ -42,10 +42,11 @@ async fn main(spawner: Spawner) -> ! {
     let read_buffer = &mut [0u8; 128];
     let write_buffer = &mut [0u8; 128];
     let mut storage = Storage::new(peripherals.FLASH, read_buffer, write_buffer);
-    
+
     wifi::start_ap(peripherals.WIFI, &spawner).await;
 
-    loop {}
+    core::future::pending::<()>().await;
+    loop {} // never happens
 }
 
 #[panic_handler]

@@ -51,8 +51,6 @@ pub async fn start_ap(wifi: WIFI<'static>, spawner: &Spawner) {
     
     stack.wait_config_up().await;
     stack.config_v4().inspect(|config| info!("config ipv4: {:?}", config));
-
-    loop {}
 }
 
 #[embassy_executor::task]

@@ -23,21 +23,20 @@ struct BufferData {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Command {
     Write,
-    Flush
+    // Flush
 }
 
 pub struct Serial {
-    rx: UsbSerialJtagRx<'static, Async>,
     channel_tx: Sender<'static, CriticalSectionRawMutex, Command, CHANNEL_BUFFER>,
 }
 
 impl Serial {
     pub async fn init(usb_device: USB_DEVICE<'static>, spawner: &Spawner) {
         let usb_serial = UsbSerialJtag::new(usb_device).into_async();
-        let (rx, tx) = usb_serial.split();
+        let (_rx, tx) = usb_serial.split();
         let (sender, receiver) = (CHANNEL.sender(), CHANNEL.receiver());
         spawner.spawn(watch(tx, receiver).unwrap());
-        *SERIAL.lock().await = Some(Self { rx, channel_tx: sender });
+        *SERIAL.lock().await = Some(Self { channel_tx: sender });
     }
 
     pub fn print(&self, bytes: &[u8]) -> Result<(), Error> {
@@ -55,9 +54,9 @@ impl Serial {
         self.channel_tx.try_send(Command::Write).map_err(|_| Error::TrySendError)
     } 
 
-    pub fn flush(&self) -> Result<(), Error> {
-        self.channel_tx.try_send(Command::Flush).map_err(|_| Error::TrySendError)
-    }
+    // pub fn flush(&self) -> Result<(), Error> {
+    //     self.channel_tx.try_send(Command::Flush).map_err(|_| Error::TrySendError)
+    // }
 
     pub fn get() -> Result<MutexGuard<'static, CriticalSectionRawMutex, Option<Serial>>, TryLockError> {
         SERIAL.try_lock()
@@ -84,9 +83,12 @@ pub async fn watch(mut tx: UsbSerialJtagTx<'static, Async>, channel_rx: Receiver
                 if size == 0 {
                     continue;
                 };
-                Write::write(&mut tx, &buffer[..size]).await;
+                if let Ok(_) = with_timeout(Duration::from_millis(100), Write::write(&mut tx, &buffer[..size])).await {
+                    with_timeout(Duration::from_millis(100), Write::flush(&mut tx)).await.ok();
+                };
             },
-            Command::Flush => { with_timeout(Duration::from_millis(100), Write::flush(&mut tx)).await.ok(); }
+            // Command::Flush => { with_timeout(Duration::from_millis(100), Write::flush(&mut tx)).await.ok(); }
+            _ => {},
         };
     };
 }
