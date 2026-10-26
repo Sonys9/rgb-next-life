@@ -7,7 +7,7 @@ macro_rules! terminal {
             use core::fmt::Write;
             let mut writer = crate::log::Terminal;
             let _ = write!(writer, $($data),*);
-            
+
             // if let Ok(serial) = crate::log::Serial::get() {
             //     if let Some(serial) = &*serial {
             //         let _ = serial.flush();

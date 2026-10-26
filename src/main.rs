@@ -4,26 +4,32 @@
 #![feature(type_alias_impl_trait)]
 
 use core::hint::black_box;
+use core::net::Ipv4Addr;
 
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
+use esp_alloc::HEAP;
 use esp_hal::clock::CpuClock;
 use esp_hal::rng::Rng;
 use esp_hal::system::software_reset;
 use esp_hal::timer::timg::TimerGroup;
-use esp_alloc::HEAP;
 
 use crate::log::Serial;
 use crate::storage::{Auth, Storage};
+use crate::wifi::AP;
 
 #[macro_use]
 mod log;
+mod bytes;
 mod errors;
 mod storage;
-mod bytes;
 mod wifi;
 
 extern crate alloc;
+
+const AP_SSID: &'static str = "RGB-NEXT-LIFE";
+const AP_PASSWORD: &'static str = "rgb!nextlife";
+const GATEAWAY_ADDR: Ipv4Addr = Ipv4Addr::new(192, 168, 67, 1);
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -43,7 +49,8 @@ async fn main(spawner: Spawner) -> ! {
     let write_buffer = &mut [0u8; 128];
     let mut storage = Storage::new(peripherals.FLASH, read_buffer, write_buffer);
 
-    wifi::start_ap(peripherals.WIFI, &spawner).await;
+    let ap = AP::new(AP_SSID, AP_PASSWORD, GATEAWAY_ADDR, peripherals.WIFI);
+    ap.start(&spawner).await;
 
     core::future::pending::<()>().await;
     loop {} // never happens
