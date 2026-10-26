@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 #![feature(macro_metavar_expr)]
+#![feature(type_alias_impl_trait)]
 
 use core::hint::black_box;
 
@@ -34,14 +35,7 @@ async fn main(spawner: Spawner) -> ! {
     esp_alloc::heap_allocator!(#[unsafe(link_section = ".dram2_uninit")] size: 66320);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let rng = Rng::new();
-    // let sw_interrupt =
-    //     esp_hal::interrupt::software::SoftwareInterrupt::new(peripherals.FROM_CPU_INTR0);
     esp_rtos::start(timg0.timer0, peripherals.FROM_CPU_INTR0);
-
-    // let (mut wifi_controller, interfaces) =
-    //     esp_radio::wifi::new(peripherals.WIFI, Default::default())
-    //         .expect("Failed to initialize Wi-Fi controller");
 
     Serial::init(peripherals.USB_DEVICE, &spawner).await;
 
@@ -49,7 +43,7 @@ async fn main(spawner: Spawner) -> ! {
     let write_buffer = &mut [0u8; 128];
     let mut storage = Storage::new(peripherals.FLASH, read_buffer, write_buffer);
     
-    
+    wifi::start_ap(peripherals.WIFI, &spawner).await;
 
     loop {}
 }
