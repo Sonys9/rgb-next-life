@@ -1,10 +1,13 @@
 use embassy_executor::Spawner;
+use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 use embassy_time::Timer;
-use picoserve::{AppBuilder, AppRouter, routing::get};
+use picoserve::{AppBuilder, AppRouter, extract::Form, response::{File, IntoResponse}, routing::{get, post}};
+use serde::Deserialize;
 
 use crate::{mk_static, storage::Auth};
 
 static CONFIG: picoserve::Config = picoserve::Config::const_default().keep_connection_alive();
+static AUTH_DATA: Signal<CriticalSectionRawMutex, Auth> = Signal::new();
 
 const TASKS_POOL: usize = 4;
 
@@ -15,10 +18,19 @@ impl AppBuilder for App {
     type PathRouter = impl picoserve::routing::PathRouter;
 
     fn build_app(self) -> picoserve::Router<Self::PathRouter> {
-        picoserve::Router::new().route(
-            "/",
-            get(|| async move { "<!DOCTYPE HTML><html><body><h1>Hello, world!</h1></body></html" }),
-        )
+        picoserve::Router::new()
+            .route(
+                "/",
+                get(Http::index),
+            )
+            .route(
+                "/submit",
+                post(|Form(auth): Form<Auth>| async move {
+                    info!("Got POST on /submit: {:?}", auth);
+                    AUTH_DATA.signal(auth);
+                    ""
+                }),
+            )
     }
 }
 
@@ -32,17 +44,18 @@ impl Http {
         Self { app: App {}, stack }
     }
 
-    pub async fn start<'a>(&'a self, spawner: &Spawner) -> Auth<'a> {
+    pub async fn start<'a>(&'a self, spawner: &Spawner) -> Auth {
         let app = mk_static!(AppRouter<App>, self.app.build_app());
         for task in 0..TASKS_POOL {
             spawner.spawn(web_task(task, self.stack, app).unwrap());
         }
 
-        Timer::after_secs(30).await;
+        AUTH_DATA.wait().await
+    }
 
-        // mspc channel which waits for Auth here
-
-        Auth { ssid: "Cool-network", password: "123123123" }
+    async fn index() -> impl IntoResponse {
+        info!("Got GET on /");
+        "<!DOCTYPE HTML><html><body><h1>Hello, world!</h1></body></html>"
     }
 }
 

@@ -65,12 +65,15 @@ async fn main(spawner: Spawner) -> ! {
                 HTTP.as_ref().unwrap()
             };
             let auth = http_ref.start(&spawner).await;
+            unsafe { HTTP = None };
+            drop(ap);
             storage.update(&auth).expect("Failed to update the storage");
             auth
         },
         Ok(auth) => auth,
         Err(e) => panic!("Failed to read the storage: {}", e)
     };
+    info!("got auth data: {:?}", auth);
 
     core::future::pending::<()>().await;
     loop {} // never happens

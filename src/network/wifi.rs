@@ -59,7 +59,7 @@ impl AP {
                 gateway: None,
                 dns_servers: Default::default(),
             }),
-            mk_static!(StackResources::<3>, StackResources::<3>::new()),
+            mk_static!(StackResources::<8>, StackResources::<8>::new()),
             seed,
         );
         spawner.spawn(net_task(runner).unwrap());

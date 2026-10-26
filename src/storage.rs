@@ -2,6 +2,7 @@ use core::slice::from_raw_parts;
 
 use esp_hal::peripherals::FLASH;
 use esp_storage::FlashStorage;
+use serde::Deserialize;
 
 use crate::{
     bytes::{align, utf8},
@@ -44,7 +45,7 @@ impl<'a> Storage<'a> {
         Ok(4 + align_to)
     }
 
-    pub fn update<'b>(&mut self, auth: &Auth<'b>) -> Result<(), Error> {
+    pub fn update<'b>(&mut self, auth: &Auth) -> Result<(), Error> {
         if auth.ssid.len() + auth.password.len() > SECTOR as usize {
             return Err(Error::TooBig);
         };
@@ -61,7 +62,7 @@ impl<'a> Storage<'a> {
         Ok((result, aligned_len - len))
     }
 
-    pub fn read(&mut self) -> Result<Auth<'a>, Error> {
+    pub fn read(&mut self) -> Result<Auth, Error> {
         self.flash
             .read(MEM_OFFSET, self.read_buffer)
             .map_err(|_| Error::StorageRead)?;
@@ -69,14 +70,14 @@ impl<'a> Storage<'a> {
         let password_pos = ssid.len() + 4 + skip;
         let (password, _) = self.read_slice(password_pos)?;
         Ok(Auth {
-            ssid: utf8(ssid)?,
-            password: utf8(password)?,
+            ssid: utf8(ssid)?.try_into().unwrap(),
+            password: utf8(password)?.try_into().unwrap(),
         })
     }
 }
 
-#[derive(Debug)]
-pub struct Auth<'b> {
-    pub ssid: &'b str,
-    pub password: &'b str,
+#[derive(Debug, Deserialize)]
+pub struct Auth {
+    pub ssid: heapless::String<64>,
+    pub password: heapless::String<128>,
 }
