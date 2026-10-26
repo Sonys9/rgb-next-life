@@ -10,14 +10,20 @@ pub enum Error {
     InvalidInput,
 
     #[error("Failed to erase the storage")]
-    Erase,
+    StorageErase,
 
     #[error("Failed to write the storage")]
-    Write,
+    StorageWrite,
 
     #[error("The data is too big")]
     TooBig,
 
     #[error("Buffer is too small")]
     Buffer,
+
+    #[error("UTF-8 parse error")]
+    Parse,
+
+    #[error("Failed to read the storage")]
+    StorageRead,
 }

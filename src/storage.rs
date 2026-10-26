@@ -1,9 +1,11 @@
+use core::slice::from_raw_parts;
+
 use embassy_embedded_hal::adapter::BlockingAsync;
 use esp_hal::peripherals::FLASH;
 use esp_storage::FlashStorage;
 use embedded_storage_async::nor_flash::{NorFlash, ReadNorFlash};
 
-use crate::errors::Error;
+use crate::{bytes::{align, utf8}, errors::Error};
 
 const MEM_OFFSET: u32 = 0x3F0000;
 const SECTOR: u32 = 4096;
@@ -20,14 +22,15 @@ impl<'a> Storage<'a> {
     }
 
     pub async fn erase(&mut self) -> Result<(), Error> {
-        self.flash.erase(MEM_OFFSET, MEM_OFFSET + SECTOR).await.map_err(|_| Error::Erase)
+        self.flash.erase(MEM_OFFSET, MEM_OFFSET + SECTOR).await.map_err(|_| Error::StorageErase)
     }
 
     pub async fn write_slice(&mut self, offset: u32, content: &[u8]) -> Result<usize, Error> {
-        self.flash.write(MEM_OFFSET + offset, &content.len().to_be_bytes()).await.map_err(|_| Error::Write)?;
-        let skip_bytes = ((content.len() + 3) & !3) - content.len();
-        self.flash.write(MEM_OFFSET + 4 + offset + skip_bytes as u32, content).await.map_err(|_| Error::Write)?;
-        Ok(4 + content.len())
+        let align_to = (content.len() + 3) & !3;
+        align(content, align_to, self.write_buffer)?;
+        self.flash.write(MEM_OFFSET + offset, &content.len().to_be_bytes()).await.map_err(|_| Error::StorageWrite)?;
+        self.flash.write(MEM_OFFSET + 4 + offset, &self.write_buffer[..align_to]).await.map_err(|_| Error::StorageWrite)?;
+        Ok(4 + align_to)
     }
 
     pub async fn update<'b>(&mut self, auth: Auth<'b>) -> Result<(), Error> {
@@ -35,32 +38,29 @@ impl<'a> Storage<'a> {
             return Err(Error::TooBig);
         };
         self.erase().await?;
-        let len = self.write_slice(0, auth.ssid).await?;
-        self.write_slice(len as u32, auth.password).await?;
+        let len = self.write_slice(0, auth.ssid.as_bytes()).await?;
+        self.write_slice(len as u32, auth.password.as_bytes()).await?;
         Ok(())
     }
 
-    pub async fn read_slice(&mut self, offset: u32) -> Result<&[u8], Error> {
-        let mut buffer = [0u8; 4];
-        self.flash.read(offset, &mut buffer).await.unwrap();
-        let len = usize::from_be_bytes(buffer);
-        self.flash.read(offset, &mut self.read_buffer[..(len + 3) & !3]).await.unwrap();
-        info!("{:?}", self.read_buffer);
-        Ok(&[])
+    pub async fn read_slice(&self, offset: usize) -> Result<(&'a [u8], usize), Error> {
+        let len = usize::from_be_bytes(self.read_buffer[offset..offset + 4].try_into().unwrap());
+        let aligned_len = (len + 3) & !3;
+        let result = unsafe { from_raw_parts(self.read_buffer.as_ptr().add(offset + 4), len)};
+        Ok((result, aligned_len - len))
     }
 
-    pub async fn read(&mut self, ssid: &[u8], password: &[u8]) -> Result<Auth<'a>, Error> {
-        if ssid.len() + password.len() > SECTOR as usize {
-            return Err(Error::TooBig);
-        };
-        self.erase().await?;
-        let len = self.write_slice(MEM_OFFSET, ssid).await?;
-        self.write_slice(MEM_OFFSET + len as u32, password).await?;
-        Ok(Auth { ssid: b"", password: b"" })
+    pub async fn read(&mut self) -> Result<Auth<'a>, Error> {
+        self.flash.read(MEM_OFFSET, self.read_buffer).await.map_err(|_| Error::StorageRead)?;
+        let (ssid, skip) = self.read_slice(0).await?;
+        let password_pos = ssid.len() + 4 + skip;
+        let (password, _) = self.read_slice(password_pos).await?;
+        Ok(Auth { ssid: utf8(ssid)?, password: utf8(password)? })
     }
 }
 
+#[derive(Debug)]
 pub struct Auth<'b> {
-    pub ssid: &'b [u8],
-    pub password: &'b [u8]
+    pub ssid: &'b str,
+    pub password: &'b str
 }

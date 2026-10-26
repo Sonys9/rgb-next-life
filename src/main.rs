@@ -7,8 +7,8 @@ use core::hint::black_box;
 use embassy_executor::Spawner;
 use embassy_time::{Duration, Timer};
 use esp_hal::clock::CpuClock;
+use esp_hal::system::software_reset;
 use esp_hal::timer::timg::TimerGroup;
-use esp_backtrace as _;
 
 use crate::log::Serial;
 use crate::storage::{Auth, Storage};
@@ -45,19 +45,14 @@ async fn main(spawner: Spawner) -> ! {
     let write_buffer = &mut [0u8; 128];
     
     let mut storage = Storage::new(peripherals.FLASH, read_buffer, write_buffer);
+    
 
-    loop {
-        Timer::after_millis(200).await;
-        
-        info!("Trying to update..");
-        storage.update(Auth { ssid: b"test network", password: b"123" }).await.unwrap();
-        info!("Done, now reading...");
-        storage.read_slice(0x3F0000).await.unwrap();
-        info!("Done");
-    }
+    
+    loop {}
 }
 
 #[panic_handler]
-fn panic(_: &core::panic::PanicInfo) -> ! {
-    loop {}
+fn panic(info: &core::panic::PanicInfo) -> ! {
+    esp_println::println!("Panic! Reason: {:?}", info);
+    software_reset()
 }
