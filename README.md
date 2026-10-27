@@ -7,7 +7,7 @@
 ## Why?
 - **Pure Asynchronous Rust**: Powered by the Embassy executor for fastest usage.
 - **Small amounts of allocations**: Forget about random crashes.
-- **Dual Control**: You can control it by using the screen or by manual editing the color by sending UDP packets (requires Wi-Fi).
+- **Triad Control**: You can control it by using the screen, by web panel or by manual editing the color by sending UDP packets (requires Wi-Fi).
 
 ## FAQ
 
@@ -24,7 +24,8 @@ esptool --chip esp32 --port PORT_HERE (/dev/tty\*\*\* or COM\*\*) erase_flash
 ```
 
 # TODO:
-- [DONE] Storage system: SSID, Password, Auth Method
+- Storage:
+    - [UNDONE] Custom simple FS
 - Network:
     - [DONE] AP Creation
     - [DONE] Web Server
