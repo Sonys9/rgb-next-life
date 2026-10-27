@@ -30,6 +30,7 @@ esptool --chip esp32 --port PORT_HERE (/dev/tty\*\*\* or COM\*\*) erase_flash
     - [DONE] Web Server
     - [UNDONE] Wi-Fi connection
     - [UNDONE] Listening for UDP packets and parsing 3 incoming bytes (RGB)
+    - [UNDONE] Web panel (with stuff that screen has)
 - Screen:
     - [UNDONE] Connect, creating easy way to include other screen drivers (traits and etc), different screen sizes
     - [UNDONE] Status, current color
